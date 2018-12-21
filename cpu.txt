@@ -1,0 +1,454 @@
+@name CPU
+@inputs DEV:wirelink StartBtn:number RunBtn:number
+@outputs Mode:number PC:number
+@persist [Mode_Idle Mode_WaitForDownload Mode_LoadPrg Mode_CanExec Mode_Ticking Mode_ExecError Mode_Halted]:number
+@persist MEMSIZE MEM:table PrgOffset:number
+@persist File:string PrgData:string [PrgSize PrgLoadIndex PrgStoreIndex]:number
+@persist REG:table
+@persist PerfLimit:number
+
+#FUNCTIONS
+if(first() | dupefinished()) {
+
+function void writeMem(Index:number, Value:number) {
+    if(Index<MEMSIZE) {
+        MEM[Index, number] = Value
+    } else {
+        DEV[Index-MEMSIZE] = Value
+    }
+}
+
+function number readMem(Index:number) {
+    if(Index<MEMSIZE) {
+        return MEM[Index, number]
+    } else {
+        return DEV[Index]
+    }
+}
+
+function void writeReg(Index:number, Value:number) {
+    REG[Index % 32, number] = Value
+}
+
+function number readReg(Index:number) {
+    return REG[Index % 32, number]
+}
+
+#
+# INSTRUCTIONS
+#
+
+function void inst_ZERO() {
+    Register = readMem(PC+1)
+    writeReg(Register, 0)
+    
+    PC = PC + 2
+}
+
+function void inst_LOAD_I_32() {
+    Register = readMem(PC+1)
+    B0 = readMem(PC+2)
+    B1 = readMem(PC+3)
+    B2 = readMem(PC+4)
+    B3 = readMem(PC+5)
+    Val = bOr(bOr(bOr(B0, bShl(B1, 8)), bShl(B2, 16)), bShl(B3, 24))
+    writeReg(Register, Val)
+    
+    PC = PC + 6
+}
+
+function void inst_STORE() {
+    Address_register = readMem(PC+1)
+    Register_to_store = readMem(PC+2)
+    
+    writeMem(readReg(Address_register), readReg(Register_to_store))
+    
+    PC = PC + 3
+}
+
+function void inst_LOAD() {
+    Register_to_fill = readMem(PC+1)
+    Address_register = readMem(PC+2)
+
+    writeReg(Register_to_fill, readMem(readReg(Address_register)))
+    
+    PC = PC + 3
+}
+
+function void inst_NEGATE() {
+    Register = readMem(PC+1)
+    
+    writeReg(Register, readReg(Register) * (-1))
+    
+    PC = PC + 2
+}
+
+function void inst_ADD() {
+    DST_Register = readMem(PC+1)
+    LHS_Register = readMem(PC+2)
+    RHS_Register = readMem(PC+3)
+    
+    writeReg(DST_Register, readReg(LHS_Register) + readReg(RHS_Register))
+    
+    PC = PC + 4
+}
+
+function void inst_SUB() {
+    DST_Register = readMem(PC+1)
+    LHS_Register = readMem(PC+2)
+    RHS_Register = readMem(PC+3)
+    
+    writeReg(DST_Register, readReg(LHS_Register) - readReg(RHS_Register))
+    
+    PC = PC + 4    
+}
+
+function void inst_RANDOM() {
+    DST_Register = readMem(PC+1)
+    LHS = readReg(readMem(PC+2))
+    RHS = readReg(readMem(PC+3))
+    
+    writeReg(DST_Register, random(LHS, RHS))
+    
+    PC = PC + 4    
+}
+
+function void inst_MUL() {
+    DST_Register = readMem(PC+1)
+    LHS_Register = readMem(PC+2)
+    RHS_Register = readMem(PC+3)
+    
+    writeReg(DST_Register, readReg(LHS_Register) * readReg(RHS_Register))
+    
+    PC = PC + 4    
+}
+
+function void inst_DIV() {
+    DST_Register = readMem(PC+1)
+    LHS_Register = readMem(PC+2)
+    RHS_Register = readMem(PC+3)
+    
+    writeReg(DST_Register, readReg(LHS_Register) / readReg(RHS_Register))
+    
+    PC = PC + 4    
+}
+
+function void inst_MODULO() {
+    DST_Register = readMem(PC+1)
+    LHS_Register = readMem(PC+2)
+    RHS_Register = readMem(PC+3)
+    
+    writeReg(DST_Register, readReg(LHS_Register) % readReg(RHS_Register))
+    
+    PC = PC + 4    
+}
+
+function void inst_INC() {
+    DST_Register = readMem(PC+1)
+    VAL_Register = readMem(PC+2)
+    
+    writeReg(DST_Register, readReg(VAL_Register) + 1)
+    
+    PC = PC + 3
+}
+
+function void inst_DEC() {
+    DST_Register = readMem(PC+1)
+    VAL_Register = readMem(PC+2)
+    
+    writeReg(DST_Register, readReg(VAL_Register) - 1)
+    
+    PC = PC + 3
+}
+
+function void inst_ABS() {
+    DST_Register = readMem(PC+1)
+    Val = readReg(readMem(PC+2))
+    
+    writeReg(DST_Register, abs(Val))
+    
+    PC = PC + 3
+}
+
+function void inst_FLOOR() {
+    DST_Register = readMem(PC+1)
+    Val = readReg(readMem(PC+2))
+    
+    writeReg(DST_Register, floor(Val))
+    
+    PC = PC + 3
+}
+
+function void inst_BEQ() {
+    Address = readReg(readMem(PC+1))
+    LHS = readReg(readMem(PC+2))
+    RHS = readReg(readMem(PC+3))
+    
+    if(LHS == RHS) {
+        PC = Address
+    } else {
+        PC = PC + 4
+    }
+}
+
+function void inst_BNEQ() {
+    Address = readReg(readMem(PC+1))
+    LHS = readReg(readMem(PC+2))
+    RHS = readReg(readMem(PC+3))
+    
+    if(LHS != RHS) {
+        PC = Address
+    } else {
+        PC = PC + 4
+    }
+}
+
+function void inst_BLT() {
+    Address = readReg(readMem(PC+1))
+    LHS = readReg(readMem(PC+2))
+    RHS = readReg(readMem(PC+3))
+    
+    if(LHS < RHS) {
+        PC = Address
+    } else {
+        PC = PC + 4
+    }
+}
+function void inst_BGEQ() {
+    Address = readReg(readMem(PC+1))
+    LHS = readReg(readMem(PC+2))
+    RHS = readReg(readMem(PC+3))
+    
+    if(LHS >= RHS) {
+        PC = Address
+    } else {
+        PC = PC + 4
+    }
+}
+
+function void inst_JMP() {
+    Address = readReg(readMem(PC+1))
+    
+    PC = Address
+}
+
+function void inst_BAND() {
+    DST_Register = readMem(PC+1)
+    LHS = readReg(readMem(PC+2))
+    RHS = readReg(readMem(PC+3))
+    
+    writeReg(DST_Register, bAnd(LHS, RHS))
+    
+    PC = PC + 4
+}
+
+function void inst_BOR() {
+    DST_Register = readMem(PC+1)
+    LHS = readReg(readMem(PC+2))
+    RHS = readReg(readMem(PC+3))
+    
+    writeReg(DST_Register, bOr(LHS, RHS))
+    
+    PC = PC + 4
+}
+
+function void inst_BXOR() {
+    DST_Register = readMem(PC+1)
+    LHS = readReg(readMem(PC+2))
+    RHS = readReg(readMem(PC+3))
+    
+    writeReg(DST_Register, bXor(LHS, RHS))
+    
+    PC = PC + 4
+}
+
+function void inst_BNOT() {
+    DST_Register = readMem(PC+1)
+    Val = readReg(readMem(PC+2))
+    
+    writeReg(DST_Register, bNot(Val))
+    
+    PC = PC + 3
+}
+
+#
+# END OF INSTRUCTIONS
+#
+
+function void tick() {
+    if(PC<PrgOffset) {
+        print("CPU: PC out of bounds")
+        Mode = Mode_ExecError
+        return
+    }
+    Opcode = readMem(PC)
+    if(Opcode == 0) { #Invalid Instruction
+        Mode = Mode_ExecError
+        print("CPU: Read INVALID instruction")
+        return
+    }
+    elseif(Opcode == 0b1) {
+        inst_LOAD_I_32()  
+    }
+    elseif(Opcode == 0b10) {
+        inst_STORE()
+    }
+    elseif(Opcode == 0b11) {
+        inst_LOAD()
+    }
+    elseif(Opcode == 0b100) {
+        inst_ZERO()
+    }
+    elseif(Opcode == 0b101) {
+        inst_NEGATE()
+    }
+    elseif(Opcode == 0b110) {
+        inst_ADD()
+    }
+    elseif(Opcode == 0b111) {
+        inst_SUB()
+    }
+    elseif(Opcode == 0b1000) {
+        inst_RANDOM()
+    }
+    elseif(Opcode == 0b1001) {
+        inst_MUL()
+    }
+    elseif(Opcode == 0b1010) {
+        inst_DIV()
+    }
+    elseif(Opcode == 0b1011) {
+        inst_MODULO()
+    }
+    elseif(Opcode == 0b1100) {
+        inst_INC()
+    }
+    elseif(Opcode == 0b1101) {
+        inst_DEC()
+    }
+    elseif(Opcode == 0b1110) {
+        inst_ABS()
+    }
+    elseif(Opcode == 0b1111) {
+        inst_FLOOR()
+    }
+    elseif(Opcode == 0b10000) {
+        inst_BEQ()
+    }
+    elseif(Opcode == 0b10001) {
+        inst_BNEQ()
+    }
+    elseif(Opcode == 0b10010) {
+        inst_BLT()
+    }
+    elseif(Opcode == 0b10011) {
+        inst_BGEQ()
+    }
+    elseif(Opcode == 0b10100) {
+        inst_JMP()
+    }
+    elseif(Opcode == 0b10101) {
+        inst_BAND()
+    }
+    elseif(Opcode == 0b10110) {
+        inst_BOR()
+    }
+    elseif(Opcode == 0b10111) {
+        inst_BXOR()
+    }
+    elseif(Opcode == 0b11000) {
+        inst_BNOT()
+    }
+    elseif(Opcode == 0b11001) {
+        print("Halting CPU")
+        Mode = Mode_Halted
+    }
+    else {
+        print("CPU: Unsupported instruction")
+        Mode = Mode_ExecError
+    }
+}
+
+} #FUNTIONS END
+
+if(first() | dupefinished()) {
+    runOnTick(1)
+    runOnHTTP(1)
+    
+    Mode_Idle = 0
+    Mode_WaitForDownload = 1
+    Mode_LoadPrg = 2 
+    Mode_CanExec = 3
+    Mode_Ticking = 4
+    Mode_ExecError = 5
+    Mode_Halted = 6
+    
+    Mode = Mode_Idle
+    
+    MEMSIZE = 2^16
+    PrgOffset = 2048
+    
+    File = "https://pastebin.com/raw/4A1a9Xjq"
+    
+    PerfLimit = 20
+    
+    print("CPU / " + MEMSIZE + "b")
+
+}
+
+if(httpClk()) {
+    if(Mode == Mode_WaitForDownload) {
+        print("CPU: Received program data. Loading now.")
+        PrgData = httpData()
+        PrgSize = PrgData:length()
+        PrgLoadIndex = 1
+        PrgStoreIndex = PrgOffset
+        Mode = Mode_LoadPrg
+    } else {
+        print("CPU: Received HTTP data while not waiting on it")
+    }
+}
+elseif(Mode == Mode_Idle) {
+    #TODO: Add button to start downloading
+    if(changed(StartBtn) & StartBtn) {
+        print("Starting download of: " + File)
+        httpRequest(File)
+        Mode = Mode_WaitForDownload
+    }
+}
+elseif(Mode == Mode_WaitForDownload) {
+}
+elseif(Mode == Mode_LoadPrg) {
+    if(PrgLoadIndex > PrgSize) {
+        Mode = Mode_CanExec
+        print("CPU: Program loaded. Ready to run.")
+        PrgData = "" #Allow Lua to gc the data
+    } else {
+        Str = PrgData[PrgLoadIndex]
+        Str += PrgData[PrgLoadIndex+1]
+        PrgLoadIndex += 2
+        Byte = Str:toNumber(16)
+        writeMem(PrgStoreIndex, Byte)
+        PrgStoreIndex += 1
+    }
+}
+elseif(Mode == Mode_CanExec) {
+    #Add button to start execution
+    Mode = Mode_Ticking
+    PC = PrgOffset
+    if(changed(StartBtn) & StartBtn) {
+        PC = PrgOffset
+        Mode = Mode_Ticking
+    }
+}
+elseif(Mode == Mode_Ticking) {
+    if(RunBtn) {
+        while(perf(PerfLimit)) {
+            tick() #Run the CPU.
+        }
+    }
+}
+elseif(Mode == Mode_ExecError) {
+}
+elseif(Mode == Mode_Halted) {
+}
