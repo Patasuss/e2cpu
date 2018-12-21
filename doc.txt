@@ -1,0 +1,32 @@
+opcode - Name - Params
+0000 0000 - INVALID - ()
+ 
+0000 0001 - LOAD_I_32 - (Reg, uint32)
+0000 0010 - STORE - (Reg, Reg)
+0000 0011 - LOAD - (Reg, Reg)
+ 
+0000 0100 - ZERO - (Reg)
+0000 0101 - NEGATE - (Reg)
+0000 0110 - ADD - (Reg, Reg, Reg)
+0000 0111 - SUB - (Reg, Reg, Reg)
+0000 1000 - RANDOM (Reg, Reg, Reg)
+0000 1001 - MUL - (Reg, Reg, Reg)
+0000 1010 - DIV - (Reg, Reg, Reg)
+0000 1011 - MODULO - (Reg, Reg, Reg)
+0000 1100 - INC (Reg, Reg)
+0000 1101 - DEC (Reg, Reg)
+0000 1110 - ABS (Reg, Reg)
+0000 1111 - FLOOR (Reg, Reg)
+ 
+0001 0000 - BEQ - (Reg, Reg, Reg)
+0001 0001 - BNEQ - (Reg, Reg, Reg)
+0001 0010 - BLT - (Reg, Reg, Reg)
+0001 0011 - BGEQ - (Reg, Reg, Reg)
+0001 0100 - JMP - (Reg)
+ 
+0001 0101 - BAND - (Reg, Reg, Reg)
+0001 0110 - BOR - (Reg, Reg, Reg)
+0001 0111 - BXOR - (Reg, Reg, Reg)
+0001 1000 - BNOT - (Reg, Reg, Reg)
+ 
+0001 1001 - HALT - ()
